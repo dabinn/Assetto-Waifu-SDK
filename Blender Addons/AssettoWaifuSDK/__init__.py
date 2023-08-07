@@ -29,48 +29,31 @@ import importlib
 if "bpy" in locals():
     if "test_reload" in locals():
         importlib.reload(test_reload)
-    print("AW Reloaded multifiles")
+    print("AWSDK: Reloaded Modules.")
 
 import bpy
-import sys
 import os
 from bpy_extras.io_utils import ExportHelper
 
-# 获取已安装插件的路径列表
-addons_path = os.path.join(bpy.utils.user_resource('SCRIPTS'), "addons")
-# 遍历路径列表，查找 VRM 插件的路径
-# print(f"addons_path: {addons_path}")
 
+
+### import modules
+from . import test_reload
+
+### external modules
+# 搜尋VRM Addon的目錄名稱(即Addon名稱)
+# todo: VRM插件不存在時報錯
+addons_path = os.path.join(bpy.utils.user_resource('SCRIPTS'), "addons")
 for vrmAddonName in os.listdir(addons_path):
     # print(f"addonName: {addonName}")
     if vrmAddonName.startswith("VRM_Addon_for_Blender"):
-        print("Found VRM addon: {}".format(vrmAddonName))
+        print("AWSDK: Found VRM addon: {}".format(vrmAddonName))
         break
 else:
     # 如果未找到 VRM 插件的路径，则使用默认路径
-    print("VRM addon not found, using default path")
+    print("AWSDK: VRM addon not found, using default path")
     vrmAddonName = "VRM_Addon_for_Blender_2_17_7"
-
-# 将 VRM_Addon_for_Blender添加到 Python 路径中
-vrm_path = os.path.join(addons_path, vrmAddonName)
-# if vrm_path not in sys.path:
-#     sys.path.append(vrm_path)
-print(f"sys.path4: {sys.path}")
-
-
-# include a file
-from . import test_reload
 vrm_export_scene = importlib.import_module(".exporter.export_scene", vrmAddonName)
-# from vrm_export_scene import *
-
-# from VRM_Addon_for_Blender_2_17_7.exporter.export_scene import *
-# vrm_export_scene = importlib.import_module('.exporter.export_scene', vrmAddonName)
-# globals().update(vars(vrm_export_scene))
-
-# vrm_export_scene = importlib.import_module(vrmAddonName + ".exporter.export_scene")
-
-# import vrm modules
-# vrm_exporter = importlib.import_module(vrmAddonName + ".exporter")
 
 
 
