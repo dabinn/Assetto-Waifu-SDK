@@ -18,21 +18,61 @@ bl_info = {
     # support為COMMUNITY時，表示此插件為社群開發，不屬於blender官方支援
     "support":     "COMMUNITY",
     "doc_url":     "https://github.com/dabinn/Assetto-Waifu-SDK",
+    # load after VRM_Addon_for_Blender
+    "priority":    10,
 }
 
-
+import importlib
 
 # deal with blender submodules reload
 # https://blender.stackexchange.com/questions/28504/blender-ignores-changes-to-python-scripts
 if "bpy" in locals():
-    import importlib
     if "test_reload" in locals():
         importlib.reload(test_reload)
-    print("Reloaded multifiles")
+    print("AW Reloaded multifiles")
 
 import bpy
+import sys
+import os
+from bpy_extras.io_utils import ExportHelper
+
+# 获取已安装插件的路径列表
+addons_path = os.path.join(bpy.utils.user_resource('SCRIPTS'), "addons")
+# 遍历路径列表，查找 VRM 插件的路径
+# print(f"addons_path: {addons_path}")
+
+for vrmAddonName in os.listdir(addons_path):
+    # print(f"addonName: {addonName}")
+    if vrmAddonName.startswith("VRM_Addon_for_Blender"):
+        print("Found VRM addon: {}".format(vrmAddonName))
+        break
+else:
+    # 如果未找到 VRM 插件的路径，则使用默认路径
+    print("VRM addon not found, using default path")
+    vrmAddonName = "VRM_Addon_for_Blender_2_17_7"
+
+# 将 VRM_Addon_for_Blender添加到 Python 路径中
+vrm_path = os.path.join(addons_path, vrmAddonName)
+# if vrm_path not in sys.path:
+#     sys.path.append(vrm_path)
+print(f"sys.path4: {sys.path}")
+
+
 # include a file
 from . import test_reload
+vrm_export_scene = importlib.import_module(".exporter.export_scene", vrmAddonName)
+# from vrm_export_scene import *
+
+# from VRM_Addon_for_Blender_2_17_7.exporter.export_scene import *
+# vrm_export_scene = importlib.import_module('.exporter.export_scene', vrmAddonName)
+# globals().update(vars(vrm_export_scene))
+
+# vrm_export_scene = importlib.import_module(vrmAddonName + ".exporter.export_scene")
+
+# import vrm modules
+# vrm_exporter = importlib.import_module(vrmAddonName + ".exporter")
+
+
 
 class bt_exportVRM(bpy.types.Operator):
     bl_idname = "object.bt_export_vrm"
@@ -49,40 +89,18 @@ class bt_exportVRM(bpy.types.Operator):
         # export_settings.file_format = 'GLB'
 
         # 執行匯出操作
-        bpy.ops.export_scene.aw('INVOKE_DEFAULT', export_only_selections=True)
-        # bpy.ops.export_scene.vrm(filepath=filepath, check_existing=False, export_settings=export_settings)
+        bpy.ops.export_scene.aw('INVOKE_DEFAULT')
+        # bpy.ops.export_scene.aw(armature_object_name="", ignore_warning=False)
+        # bpy.ops.export_scene.aw('INVOKE_DEFAULT', export_only_selections=True)
+        # bpy.ops.export_scene.aw(filepath=filepath, check_existing=False, export_settings=export_settings)
 
         return {'FINISHED'}
 
-import sys
-import os
-from bpy_extras.io_utils import ExportHelper
 
 
-# 获取已安装插件的路径列表
-addons_path = os.path.join(bpy.utils.user_resource('SCRIPTS'), "addons")
-# 遍历路径列表，查找 VRM 插件的路径
-# print(f"addons_path: {addons_path}")
-for addonName in os.listdir(addons_path):
-    # print(f"addonName: {addonName}")
-    if addonName.startswith("VRM_Addon_for_Blender"):
-        vrm_path = os.path.join(addons_path, addonName)
-        print("Found VRM addon at: {}".format(vrm_path))
-        break
-else:
-    # 如果未找到 VRM 插件的路径，则使用默认路径
-    print("VRM addon not found, using default path")
-    vrm_path = os.path.join(os.path.dirname(__file__), "VRM_Addon_for_Blender_2_17_7")
 
-# 将 VRM_Addon_for_Blender添加到 Python 路径中
-sys.path.append(vrm_path)
-
-
-# VRM_Addon_for_Blender相關import
-from VRM_Addon_for_Blender_2_17_7.exporter.export_scene import *
-from VRM_Addon_for_Blender_2_17_7.editor import search, validation
-
-class EXPORT_SCENE_OT_AW(bpy.types.Operator, ExportHelper):  # type: ignore[misc]
+# Todo: error type not implemented
+class EXPORT_SCENE_OT_aw(bpy.types.Operator, ExportHelper):  # type: ignore[misc]
     bl_idname = "export_scene.aw"
     bl_label = "Export Assetto Waifu"
     bl_description = "Export Assetto Waifu"
@@ -95,21 +113,22 @@ class EXPORT_SCENE_OT_AW(bpy.types.Operator, ExportHelper):  # type: ignore[misc
 
     export_invisibles: bpy.props.BoolProperty(  # type: ignore[valid-type]
         name="Export Invisible Objects",  # noqa: F722
-        update=export_vrm_update_addon_preferences,
+        update=vrm_export_scene.export_vrm_update_addon_preferences,
     )
     export_only_selections: bpy.props.BoolProperty(  # type: ignore[valid-type]
         name="Export Only Selections",  # noqa: F722
-        update=export_vrm_update_addon_preferences,
+        update=vrm_export_scene.export_vrm_update_addon_preferences,
     )
     enable_advanced_preferences: bpy.props.BoolProperty(  # type: ignore[valid-type]
         name="Enable Advanced Options",  # noqa: F722
-        update=export_vrm_update_addon_preferences,
+        update=vrm_export_scene.export_vrm_update_addon_preferences,
     )
     export_fb_ngon_encoding: bpy.props.BoolProperty(  # type: ignore[valid-type]
         name="Try the FB_ngon_encoding under development (Exported meshes can be corrupted)",  # noqa: F722
-        update=export_vrm_update_addon_preferences,
+        update=vrm_export_scene.export_vrm_update_addon_preferences,
     )
     # errors: bpy.props.CollectionProperty(type=validation.VrmValidationError)  # type: ignore[valid-type]
+    # errors=None
     armature_object_name: bpy.props.StringProperty(  # type: ignore[valid-type]
         options={"HIDDEN"},  # noqa: F821
     )
@@ -128,7 +147,7 @@ class EXPORT_SCENE_OT_AW(bpy.types.Operator, ExportHelper):  # type: ignore[misc
         ) != {"FINISHED"}:
             return {"CANCELLED"}
 
-        preferences = get_preferences(context)
+        preferences = vrm_export_scene.get_preferences(context)
         export_invisibles = bool(preferences.export_invisibles)
         export_only_selections = bool(preferences.export_only_selections)
         if preferences.enable_advanced_preferences:
@@ -136,7 +155,7 @@ class EXPORT_SCENE_OT_AW(bpy.types.Operator, ExportHelper):  # type: ignore[misc
         else:
             export_fb_ngon_encoding = False
 
-        export_objects = search.export_objects(
+        export_objects = vrm_export_scene.search.export_objects(
             context,
             export_invisibles,
             export_only_selections,
@@ -148,11 +167,11 @@ class EXPORT_SCENE_OT_AW(bpy.types.Operator, ExportHelper):  # type: ignore[misc
         )
 
         if is_vrm1:
-            vrm_exporter: AbstractBaseVrmExporter = Gltf2AddonVrmExporter(
+            vrm_exporter: vrm_export_scene.AbstractBaseVrmExporter = vrm_export_scene.Gltf2AddonVrmExporter(
                 context, export_objects
             )
         else:
-            vrm_exporter = LegacyVrmExporter(
+            vrm_exporter = vrm_export_scene.LegacyVrmExporter(
                 context,
                 export_objects,
                 export_fb_ngon_encoding,
@@ -161,11 +180,11 @@ class EXPORT_SCENE_OT_AW(bpy.types.Operator, ExportHelper):  # type: ignore[misc
         vrm_bin = vrm_exporter.export_vrm()
         if vrm_bin is None:
             return {"CANCELLED"}
-        Path(self.filepath).write_bytes(vrm_bin)
+        vrm_export_scene.Path(self.filepath).write_bytes(vrm_bin)
         return {"FINISHED"}
 
     def invoke(self, context: bpy.types.Context, event: bpy.types.Event) -> set[str]:
-        preferences = get_preferences(context)
+        preferences = vrm_export_scene.get_preferences(context)
         (
             self.export_invisibles,
             self.export_only_selections,
@@ -177,17 +196,17 @@ class EXPORT_SCENE_OT_AW(bpy.types.Operator, ExportHelper):  # type: ignore[misc
             bool(preferences.enable_advanced_preferences),
             bool(preferences.export_fb_ngon_encoding),
         )
-        if not use_legacy_importer_exporter() and "gltf" not in dir(
+        if not vrm_export_scene.use_legacy_importer_exporter() and "gltf" not in dir(
             bpy.ops.export_scene
         ):
-            return cast(
+            return vrm_export_scene.cast(
                 set[str],
                 bpy.ops.wm.vrm_gltf2_addon_disabled_warning(
                     "INVOKE_DEFAULT",
                 ),
             )
 
-        export_objects = search.export_objects(
+        export_objects = vrm_export_scene.search.export_objects(
             context,
             bool(self.export_invisibles),
             bool(self.export_only_selections),
@@ -200,8 +219,8 @@ class EXPORT_SCENE_OT_AW(bpy.types.Operator, ExportHelper):  # type: ignore[misc
             return {"CANCELLED"}
         if len(armatures) == 1 and armatures[0].data.vrm_addon_extension.is_vrm0():
             armature = armatures[0]
-            Vrm0HumanoidPropertyGroup.fixup_human_bones(armature)
-            Vrm0HumanoidPropertyGroup.check_last_bone_names_and_update(
+            vrm_export_scene.Vrm0HumanoidPropertyGroup.fixup_human_bones(armature)
+            vrm_export_scene.Vrm0HumanoidPropertyGroup.check_last_bone_names_and_update(
                 armature.data.name,
                 defer=False,
             )
@@ -219,8 +238,8 @@ class EXPORT_SCENE_OT_AW(bpy.types.Operator, ExportHelper):  # type: ignore[misc
                 return {"CANCELLED"}
         elif len(armatures) == 1 and armatures[0].data.vrm_addon_extension.is_vrm1():
             armature = armatures[0]
-            Vrm1HumanBonesPropertyGroup.fixup_human_bones(armature)
-            Vrm1HumanBonesPropertyGroup.check_last_bone_names_and_update(
+            vrm_export_scene.Vrm1HumanBonesPropertyGroup.fixup_human_bones(armature)
+            vrm_export_scene.Vrm1HumanBonesPropertyGroup.check_last_bone_names_and_update(
                 armature.data.name,
                 defer=False,
             )
@@ -258,7 +277,7 @@ class EXPORT_SCENE_OT_AW(bpy.types.Operator, ExportHelper):  # type: ignore[misc
         #     )
         #     return {"CANCELLED"}
 
-        return cast(set[str], ExportHelper.invoke(self, context, event))
+        return vrm_export_scene.cast(set[str], ExportHelper.invoke(self, context, event))
 
     def draw(self, _context: bpy.types.Context) -> None:
         pass  # Is needed to get panels available
@@ -387,8 +406,8 @@ class pn_AssettoWaifuSDK2(bpy.types.Panel):
 
 
 def register():
-    # test_reload.register()
-    bpy.utils.register_class(EXPORT_SCENE_OT_AW)
+    # bpy.utils.register_class(awValidation.VrmValidationError)
+    bpy.utils.register_class(EXPORT_SCENE_OT_aw)
     bpy.utils.register_class(bt_exportVRM)
     bpy.utils.register_class(bt_printBoneName)
     bpy.utils.register_class(bt_vrmTestButton)
@@ -396,7 +415,8 @@ def register():
     bpy.utils.register_class(pn_AssettoWaifuSDK2)
 
 def unregister():
-    bpy.utils.unregister_class(EXPORT_SCENE_OT_AW)
+    # bpy.utils.unregister_class(awValidation.VrmValidationError)
+    bpy.utils.unregister_class(EXPORT_SCENE_OT_aw)
     bpy.utils.unregister_class(bt_exportVRM)
     bpy.utils.unregister_class(bt_printBoneName)
     bpy.utils.unregister_class(bt_vrmTestButton)
