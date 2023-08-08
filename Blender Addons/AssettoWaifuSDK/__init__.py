@@ -18,8 +18,6 @@ bl_info = {
     # support為COMMUNITY時，表示此插件為社群開發，不屬於blender官方支援
     "support":     "COMMUNITY",
     "doc_url":     "https://github.com/dabinn/Assetto-Waifu-SDK",
-    # load after VRM_Addon_for_Blender
-    "priority":    10,
 }
 
 # todos:
