@@ -123,6 +123,13 @@ class EXPORT_SCENE_OT_aw(bpy.types.Operator, ExportHelper):  # type: ignore[misc
         options={"HIDDEN"},  # noqa: F821
     )
 
+    # icon可用的參數有：
+    # 'NONE', 'QUESTION', 'ERROR', 'CANCEL', 'TRIA_RIGHT', 'TRIA_DOWN', 'TRIA_LEFT', 'TRIA_UP', 'ARROW_LEFTRIGHT', 'PLUS', 'DISCLOSURE_TRI_DOWN', 'DISCLOSURE_TRI_RIGHT', 'RADIOBUT_ON', 'RADIOBUT_OFF', 'MENU_PANEL', 'BLENDER', 'GRIP', 'DOT', 'COLLAPSEMENU', 'X', 'GO_LEFT', 'PLUG', 'UI', 'NODE', 'NODE_SEL', 'FULLSCREEN', 'SPLITSCREEN', 'RIGHTARROW_THIN', 'DOWNARROW_HLT', 'DOTSUP', 'DOTSDOWN', 'LINK_AREA', 'LINK', 'INLINK', 'PLUGIN'
+    icon = "NONE"
+    msg = ""
+
+
+
     def execute(self, context: bpy.types.Context) -> set[str]:
         if not self.filepath:
             return {"CANCELLED"}
@@ -171,6 +178,9 @@ class EXPORT_SCENE_OT_aw(bpy.types.Operator, ExportHelper):  # type: ignore[misc
         return {"FINISHED"}
 
     def invoke(self, context: bpy.types.Context, event: bpy.types.Event) -> set[str]:
+        # self.icon = "ERROR"
+        # self.msg = "123"
+
         preferences = vrm_export_scene.get_preferences(context)
         (
             self.export_invisibles,
@@ -286,6 +296,10 @@ class EXPORT_SCENE_OT_aw(bpy.types.Operator, ExportHelper):  # type: ignore[misc
                 operator.errors, False, layout.box()
             )
 
+        if self.msg:
+            row = layout.row()
+            row.emboss = "NONE"
+            row.box().label(text=self.msg, icon=self.icon)
 
 
 class bt_printBoneName(bpy.types.Operator):
