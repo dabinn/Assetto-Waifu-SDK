@@ -22,6 +22,9 @@ bl_info = {
     "priority":    10,
 }
 
+# todos:
+# - 輸出設定由glb改為gltf
+
 import importlib
 
 # deal with blender submodules reload
@@ -72,10 +75,13 @@ class bt_exportVRM(bpy.types.Operator):
 
 
         # 執行匯出操作
-        bpy.ops.export_scene.aw('INVOKE_DEFAULT')
-        # bpy.ops.export_scene.aw(armature_object_name="", ignore_warning=False)
+        bpy.ops.export_scene.aw(
+            'INVOKE_DEFAULT',
+            armature_object_name="",
+            ignore_warning=False,
+        )
+        # bpy.ops.export_scene.aw('INVOKE_DEFAULT')
         # bpy.ops.export_scene.aw('INVOKE_DEFAULT', export_only_selections=True)
-        # bpy.ops.export_scene.aw(filepath=filepath, check_existing=False, export_settings=export_settings)
 
         return {'FINISHED'}
 
@@ -262,8 +268,25 @@ class EXPORT_SCENE_OT_aw(bpy.types.Operator, ExportHelper):  # type: ignore[misc
 
         return vrm_export_scene.cast(set[str], ExportHelper.invoke(self, context, event))
 
-    def draw(self, _context: bpy.types.Context) -> None:
-        pass  # Is needed to get panels available
+    def draw(self, context: bpy.types.Context) -> None:
+        # These codes are copied from export_scene.VRM_PT_export_error_messages()
+        # It's poll fucntion is set to str(context.space_data.active_operator.bl_idname) == "EXPORT_SCENE_OT_vrm"
+        # So the options are only displayed in EXPORT_SCENE_OT_vrm, not in EXPORT_SCENE_OT_aw
+        layout = self.layout
+
+        operator = context.space_data.active_operator
+
+        layout.prop(operator, "export_invisibles")
+        layout.prop(operator, "export_only_selections")
+        layout.prop(operator, "enable_advanced_preferences")
+        if operator.enable_advanced_preferences:
+            advanced_options_box = layout.box()
+            advanced_options_box.prop(operator, "export_fb_ngon_encoding")
+
+        if operator.errors:
+            vrm_export_scene.validation.WM_OT_vrm_validator.draw_errors(
+                operator.errors, False, layout.box()
+            )
 
 
 
