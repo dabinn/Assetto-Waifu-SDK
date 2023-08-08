@@ -64,12 +64,12 @@ class bt_exportVRM(bpy.types.Operator):
 
     def execute(self, context):
 
-        # 設定匯出檔案的路徑和檔名
-        # filepath = "path/to/exported/file.glb"
-
-        # 設定匯出的選項
+        # # Not working
         # export_settings = bpy.context.scene.vrm_export_settings
-        # export_settings.file_format = 'GLB'
+        # # debug export_settings
+        # print(f"export_settings: {export_settings}")
+        # # export_settings.file_format = 'GLB'
+
 
         # 執行匯出操作
         bpy.ops.export_scene.aw('INVOKE_DEFAULT')
@@ -80,9 +80,10 @@ class bt_exportVRM(bpy.types.Operator):
         return {'FINISHED'}
 
 
+class VrmValidationError(bpy.types.PropertyGroup):  # type: ignore[misc]
+    message: bpy.props.StringProperty()  # type: ignore[valid-type]
+    severity: bpy.props.IntProperty(min=0)  # type: ignore[valid-type]
 
-
-# Todo: error type not implemented
 class EXPORT_SCENE_OT_aw(bpy.types.Operator, ExportHelper):  # type: ignore[misc]
     bl_idname = "export_scene.aw"
     bl_label = "Export Assetto Waifu"
@@ -91,7 +92,7 @@ class EXPORT_SCENE_OT_aw(bpy.types.Operator, ExportHelper):  # type: ignore[misc
 
     filename_ext = ".gltf"
     filter_glob: bpy.props.StringProperty(  # type: ignore[valid-type]
-        default="*.vrm", options={"HIDDEN"}  # noqa: F722,F821
+        default="*.gltf", options={"HIDDEN"}  # noqa: F722,F821
     )
 
     export_invisibles: bpy.props.BoolProperty(  # type: ignore[valid-type]
@@ -110,8 +111,7 @@ class EXPORT_SCENE_OT_aw(bpy.types.Operator, ExportHelper):  # type: ignore[misc
         name="Try the FB_ngon_encoding under development (Exported meshes can be corrupted)",  # noqa: F722
         update=vrm_export_scene.export_vrm_update_addon_preferences,
     )
-    # errors: bpy.props.CollectionProperty(type=validation.VrmValidationError)  # type: ignore[valid-type]
-    # errors=None
+    errors: bpy.props.CollectionProperty(type=VrmValidationError)  # type: ignore[valid-type]
     armature_object_name: bpy.props.StringProperty(  # type: ignore[valid-type]
         options={"HIDDEN"},  # noqa: F821
     )
@@ -247,18 +247,18 @@ class EXPORT_SCENE_OT_aw(bpy.types.Operator, ExportHelper):  # type: ignore[misc
         ) != {"FINISHED"}:
             return {"CANCELLED"}
 
-        # validation.WM_OT_vrm_validator.detect_errors(
-        #     context,
-        #     self.errors,
-        #     self.armature_object_name,
-        # )
-        # if not self.ignore_warning and any(
-        #     error.severity <= 1 for error in self.errors
-        # ):
-        #     bpy.ops.wm.vrm_export_confirmation(
-        #         "INVOKE_DEFAULT", armature_object_name=self.armature_object_name
-        #     )
-        #     return {"CANCELLED"}
+        vrm_export_scene.validation.WM_OT_vrm_validator.detect_errors(
+            context,
+            self.errors,
+            self.armature_object_name,
+        )
+        if not self.ignore_warning and any(
+            error.severity <= 1 for error in self.errors
+        ):
+            bpy.ops.wm.vrm_export_confirmation(
+                "INVOKE_DEFAULT", armature_object_name=self.armature_object_name
+            )
+            return {"CANCELLED"}
 
         return vrm_export_scene.cast(set[str], ExportHelper.invoke(self, context, event))
 
@@ -387,24 +387,25 @@ class pn_AssettoWaifuSDK2(bpy.types.Panel):
         # row.operator("object.bt_test_reload")
 
 
-
+classes = [
+    VrmValidationError,
+    EXPORT_SCENE_OT_aw,
+    bt_exportVRM,
+    bt_printBoneName,
+    bt_vrmTestButton,
+    pn_AssettoWaifuSDK,
+    pn_AssettoWaifuSDK2,
+]
 def register():
-    # bpy.utils.register_class(awValidation.VrmValidationError)
-    bpy.utils.register_class(EXPORT_SCENE_OT_aw)
-    bpy.utils.register_class(bt_exportVRM)
-    bpy.utils.register_class(bt_printBoneName)
-    bpy.utils.register_class(bt_vrmTestButton)
-    bpy.utils.register_class(pn_AssettoWaifuSDK)
-    bpy.utils.register_class(pn_AssettoWaifuSDK2)
-
+    for cls in classes:
+        bpy.utils.register_class(cls)
+ 
 def unregister():
-    # bpy.utils.unregister_class(awValidation.VrmValidationError)
-    bpy.utils.unregister_class(EXPORT_SCENE_OT_aw)
-    bpy.utils.unregister_class(bt_exportVRM)
-    bpy.utils.unregister_class(bt_printBoneName)
-    bpy.utils.unregister_class(bt_vrmTestButton)
-    bpy.utils.unregister_class(pn_AssettoWaifuSDK)
-    bpy.utils.unregister_class(pn_AssettoWaifuSDK2)
-
+    for cls in reversed(classes):
+        try:
+            bpy.utils.unregister_class(cls)
+        except RuntimeError:
+            print(f"AWSDK: Failed to Unregister {cls}")
+ 
 if __name__ == "__main__":
     register()
