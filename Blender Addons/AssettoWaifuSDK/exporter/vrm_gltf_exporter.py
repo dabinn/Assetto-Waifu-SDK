@@ -32,36 +32,24 @@ from VRM_Addon_for_Blender_2_17_7.common.gltf import (
 )
 import json
 from VRM_Addon_for_Blender_2_17_7.common.deep import Json
+
+
+# Workflow:
+# EXPORT_SCENE_OT_aw.execute (inherit/Redirect the exporter)
+# --> awGltfExporter.export_vrm (inherit)
+# --> awGltfExporter.pack(inherit/overriding)
+# --> pack_gltf()
+
+# Replaces pack_glb() from common\gltf.py
 def pack_gltf(json_dict: dict[str, Json]) -> bytes:
-    ## Original pack_glb()
-    # magic = b"glTF" + struct.pack("<I", 2)
-    # json_str = json.dumps(json_dict).encode("utf-8")
-    # if len(json_str) % 4 != 0:
-    #     json_str += b"\x20" * (4 - len(json_str) % 4)
-    # json_size = struct.pack("<I", len(json_str))
-    # if len(binary_chunk) % 4 != 0:
-    #     binary_chunk += b"\x00" * (4 - len(binary_chunk) % 4)
-    # bin_size = struct.pack("<I", len(binary_chunk))
-    # total_size = struct.pack(
-    #     "<I", len(json_str) + len(binary_chunk) + 28
-    # )  # include header size
-    # return (
-    #     magic
-    #     + total_size
-    #     + json_size
-    #     + b"JSON"
-    #     + json_str
-    #     + bin_size
-    #     + b"BIN\x00"
-    #     + binary_chunk
-    # )
+    print("AWSDK: packing gltf...")
     json_str = json.dumps(json_dict).encode("utf-8")
     return (
         json_str
     )
 
 # Replaces the original VRM Exporter
-class LegacyVrmExporter(vrm_export_scene.LegacyVrmExporter):
+class awGltfExporter(vrm_export_scene.LegacyVrmExporter):
 
     #### properties整理
 
@@ -161,90 +149,89 @@ class LegacyVrmExporter(vrm_export_scene.LegacyVrmExporter):
         # self.result = pack_glb(self.json_dict, bin_chunk)          
         self.result = pack_gltf(self.json_dict)          
 
-    def export_gltf(self) -> Optional[bytes]:
-        print("AWSDK: Exporting gltf...")
-        wm = self.context.window_manager
-        wm.progress_begin(0, 11)
-        blend_shape_previews = self.clear_blend_shape_proxy_previews(self.armature)
-        object_name_and_modifier_names = self.hide_mtoon1_outline_geometry_nodes()
-        try:
-            self.setup_pose(
-                self.armature,
-                self.armature.data.vrm_addon_extension.vrm0.humanoid.pose_library,
-                self.armature.data.vrm_addon_extension.vrm0.humanoid.pose_marker_name,
-            )
-            wm.progress_update(1)
+    ## This for explaining each step of export_vrm()
+    # def export_vrm(self) -> Optional[bytes]:
+    #     wm = self.context.window_manager
+    #     wm.progress_begin(0, 11)
+    #     blend_shape_previews = self.clear_blend_shape_proxy_previews(self.armature)
+    #     object_name_and_modifier_names = self.hide_mtoon1_outline_geometry_nodes()
+    #     try:
+    #         self.setup_pose(
+    #             self.armature,
+    #             self.armature.data.vrm_addon_extension.vrm0.humanoid.pose_library,
+    #             self.armature.data.vrm_addon_extension.vrm0.humanoid.pose_marker_name,
+    #         )
+    #         wm.progress_update(1)
 
-            #--> self.glb_bin_collector
-            self.image_to_bin() 
-            wm.progress_update(2)
+    #         #--> self.glb_bin_collector
+    #         self.image_to_bin() 
+    #         wm.progress_update(2)
 
-            #--> self.json_dict : "scenes", "nodes", "skins", 
-            # (沒寫到的還有)：
-            # "images", "animations", "cameras", "extensionsUsed"
-            self.armature_to_node_and_scenes_dict()
-            wm.progress_update(3)
+    #         #--> self.json_dict : "scenes", "nodes", "skins", 
+    #         # (沒寫到的還有)：
+    #         # "images", "animations", "cameras", "extensionsUsed"
+    #         self.armature_to_node_and_scenes_dict()
+    #         wm.progress_update(3)
 
-            # 先從glb_bin_collector讀出image_bin，再寫入json_dict
-            #--> self.json_dict : "samplers", "textures", "materials", "extensions":"VRM":"materialProperties"
-            # 這邊也有加入一些image到glb_bin_collector
-            self.material_to_dict()
-            wm.progress_update(4)
+    #         # 先從glb_bin_collector讀出image_bin，再寫入json_dict
+    #         #--> self.json_dict : "samplers", "textures", "materials", "extensions":"VRM":"materialProperties"
+    #         # 這邊也有加入一些image到glb_bin_collector
+    #         self.material_to_dict()
+    #         wm.progress_update(4)
 
-            ## 把某部份export_object的modifier的visibility記錄下來？
-            #--> modifier_dict (?)
-            #--> self.outline_modifier_visibilities
-            self.hide_outline_modifiers()
-            wm.progress_update(5)
+    #         ## 把某部份export_object的modifier的visibility記錄下來？
+    #         #--> modifier_dict (?)
+    #         #--> self.outline_modifier_visibilities
+    #         self.hide_outline_modifiers()
+    #         wm.progress_update(5)
             
-            # 這邊會把mesh的資料寫入json_dict
-            #--> self.json_dict : "meshes"
-            #--> self.mesh_name_to_index[mesh.name] = mesh_index
-            # mesh_dicts = self.json_dict.get("meshes")
-            # 有作is_skin_mesh判斷，會無視transform (node_dict["translation"]歸零)
-            self.mesh_to_bin_and_dict()
-            wm.progress_update(6)
+    #         # 這邊會把mesh的資料寫入json_dict
+    #         #--> self.json_dict : "meshes"
+    #         #--> self.mesh_name_to_index[mesh.name] = mesh_index
+    #         # mesh_dicts = self.json_dict.get("meshes")
+    #         # 有作is_skin_mesh判斷，會無視transform (node_dict["translation"]歸零)
+    #         self.mesh_to_bin_and_dict()
+    #         wm.progress_update(6)
 
-            #--> self.modifier_dict
-            # 不太清楚作用
-            self.restore_outline_modifiers()
-            wm.progress_update(7)
+    #         #--> self.modifier_dict
+    #         # 不太清楚作用
+    #         self.restore_outline_modifiers()
+    #         wm.progress_update(7)
             
-            #--> self.json_dict.update(gltf_meta_dict)
-            # 看起來是把json_dict拉出來，加入一些meta資料，再塞回去
-            self.json_dict["scene"] = 0
-            self.gltf_meta_to_dict()
-            wm.progress_update(8)
+    #         #--> self.json_dict.update(gltf_meta_dict)
+    #         # 看起來是把json_dict拉出來，加入一些meta資料，再塞回去
+    #         self.json_dict["scene"] = 0
+    #         self.gltf_meta_to_dict()
+    #         wm.progress_update(8)
             
-            # VRM的meta資料，裏面有很多東西
-            # 主要也是塞進json_dict
-            # 包含：...太多了
-            # 後面的日文註解是說："collider" 和 "meta" 之類的東西....
-            self.vrm_meta_to_dict()  # colliderとかmetaとか....
-            wm.progress_update(9)
+    #         # VRM的meta資料，裏面有很多東西
+    #         # 主要也是塞進json_dict
+    #         # 包含：...太多了
+    #         # 後面的日文註解是說："collider" 和 "meta" 之類的東西....
+    #         self.vrm_meta_to_dict()  # colliderとかmetaとか....
+    #         wm.progress_update(9)
             
-            # 裏面的注釋寫：
-            # 在cluster中，不允许没有材质的基本元素，因此需要分配一个空材质。
-            self.fill_empty_material()
-            wm.progress_update(10)
+    #         # 裏面的注釋寫：
+    #         # 在cluster中，不允许没有材质的基本元素，因此需要分配一个空材质。
+    #         self.fill_empty_material()
+    #         wm.progress_update(10)
             
-            #--> self.result
-            self.pack()
-        finally:
-            ## 一些復原工作
-            try:
-                self.restore_pose(self.armature)
-                self.restore_mtoon1_outline_geometry_nodes(
-                    object_name_and_modifier_names
-                )
-                self.restore_blend_shape_proxy_previews(
-                    self.armature, blend_shape_previews
-                )
-                self.cleanup()
-            finally:
-                wm.progress_end()
-        print("AWSDK: gltf OK.")
-        return self.result
+    #         #--> self.result
+    #         self.pack()
+    #     finally:
+    #         ## 一些復原工作
+    #         try:
+    #             self.restore_pose(self.armature)
+    #             self.restore_mtoon1_outline_geometry_nodes(
+    #                 object_name_and_modifier_names
+    #             )
+    #             self.restore_blend_shape_proxy_previews(
+    #                 self.armature, blend_shape_previews
+    #             )
+    #             self.cleanup()
+    #         finally:
+    #             wm.progress_end()
+    #     return self.result
 
 # types is needed to be defined for EXPORT_SCENE_OT_aw class
 class VrmValidationError(bpy.types.PropertyGroup):  # type: ignore[misc]
@@ -269,6 +256,57 @@ class EXPORT_SCENE_OT_aw(vrm_export_scene.EXPORT_SCENE_OT_vrm):  # type: ignore[
     # 'NONE', 'QUESTION', 'ERROR', 'CANCEL', 'TRIA_RIGHT', 'TRIA_DOWN', 'TRIA_LEFT', 'TRIA_UP', 'ARROW_LEFTRIGHT', 'PLUS', 'DISCLOSURE_TRI_DOWN', 'DISCLOSURE_TRI_RIGHT', 'RADIOBUT_ON', 'RADIOBUT_OFF', 'MENU_PANEL', 'BLENDER', 'GRIP', 'DOT', 'COLLAPSEMENU', 'X', 'GO_LEFT', 'PLUG', 'UI', 'NODE', 'NODE_SEL', 'FULLSCREEN', 'SPLITSCREEN', 'RIGHTARROW_THIN', 'DOWNARROW_HLT', 'DOTSUP', 'DOTSDOWN', 'LINK_AREA', 'LINK', 'INLINK', 'PLUGIN'
     icon = "NONE"
     msg = ""
+
+    def execute(self, context: bpy.types.Context) -> set[str]:
+        if not self.filepath:
+            return {"CANCELLED"}
+
+        if bpy.ops.vrm.model_validate(
+            "INVOKE_DEFAULT",
+            show_successful_message=False,
+            armature_object_name=self.armature_object_name,
+        ) != {"FINISHED"}:
+            return {"CANCELLED"}
+
+        preferences = vrm_export_scene.get_preferences(context)
+        export_invisibles = bool(preferences.export_invisibles)
+        export_only_selections = bool(preferences.export_only_selections)
+        if preferences.enable_advanced_preferences:
+            export_fb_ngon_encoding = bool(preferences.export_fb_ngon_encoding)
+        else:
+            export_fb_ngon_encoding = False
+
+        export_objects = vrm_export_scene.search.export_objects(
+            context,
+            export_invisibles,
+            export_only_selections,
+            self.armature_object_name,
+        )
+        is_vrm1 = any(
+            obj.type == "ARMATURE" and obj.data.vrm_addon_extension.is_vrm1()
+            for obj in export_objects
+        )
+
+        if is_vrm1:
+            vrm_exporter: vrm_export_scene.AbstractBaseVrmExporter = vrm_export_scene.Gltf2AddonVrmExporter(
+                context, export_objects
+            )
+        else:
+            # Change to awGltfExporter
+            vrm_exporter = awGltfExporter(
+            # vrm_exporter = vrm_export_scene.LegacyVrmExporter(
+                context,
+                export_objects,
+                export_fb_ngon_encoding,
+            )
+
+        print("AWSDK: Exporting gltf...")
+        vrm_bin = vrm_exporter.export_vrm()
+        print("AWSDK: gltf OK.")
+        if vrm_bin is None:
+            return {"CANCELLED"}
+        vrm_export_scene.Path(self.filepath).write_bytes(vrm_bin)
+        return {"FINISHED"}
 
     def draw(self, context: bpy.types.Context) -> None:
         # These codes are copied from export_scene.VRM_PT_export_error_messages()
