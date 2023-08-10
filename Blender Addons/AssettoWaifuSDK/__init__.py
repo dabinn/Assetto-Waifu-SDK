@@ -21,7 +21,9 @@ bl_info = {
 }
 
 # todos:
-# - 輸出設定由glb改為gltf
+# Export FBX with dedicated parameters for Aseetto Waifu.
+# Export FBX.ini for KsEditor
+# Add an option to disable FBX.ini overwrite
 
 import importlib
 
@@ -34,7 +36,7 @@ if "bpy" in locals():
 
 import bpy
 
-### import sub modules
+### import submodules
 from .exporter import vrm_gltf_exporter
 
 
