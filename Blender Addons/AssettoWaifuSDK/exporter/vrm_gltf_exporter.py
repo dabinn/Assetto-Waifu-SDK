@@ -1,7 +1,8 @@
 import importlib
 import bpy
 import os
-from bpy_extras.io_utils import ExportHelper
+import json
+
 
 
 ### external modules
@@ -17,21 +18,10 @@ else:
     # 如果未找到 VRM 插件的路径，则使用默认路径
     print("AWSDK: VRM addon not found, using default path")
     vrmAddonName = "VRM_Addon_for_Blender_2_17_7"
-vrm_export_scene = importlib.import_module(".exporter.export_scene", vrmAddonName)
 
-
-
-from typing import Optional
-from VRM_Addon_for_Blender_2_17_7.editor import migration, search
-from VRM_Addon_for_Blender_2_17_7.common.mtoon_unversioned import MtoonUnversioned
-from VRM_Addon_for_Blender_2_17_7.common.gltf import (
-    FLOAT_NEGATIVE_MAX,
-    FLOAT_POSITIVE_MAX,
-    TEXTURE_INPUT_NAMES,
-    pack_glb,
-)
-import json
-from VRM_Addon_for_Blender_2_17_7.common.deep import Json
+vrm_export_scene = importlib.import_module( vrmAddonName+".exporter.export_scene")
+vrm_deep = importlib.import_module(vrmAddonName+".common.deep")
+Json = vrm_deep.Json
 
 
 # Workflow:
@@ -40,7 +30,7 @@ from VRM_Addon_for_Blender_2_17_7.common.deep import Json
 # --> awGltfExporter.pack(inherit/overriding)
 # --> pack_gltf()
 
-# Replaces pack_glb() from common\gltf.py
+# Replaces pack_glb() from VRM_Addon_for_Blender/common/gltf.py
 def pack_gltf(json_dict: dict[str, Json]) -> bytes:
     print("AWSDK: packing gltf...")
     json_str = json.dumps(json_dict).encode("utf-8")
