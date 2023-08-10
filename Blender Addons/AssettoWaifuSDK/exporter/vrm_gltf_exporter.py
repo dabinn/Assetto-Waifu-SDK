@@ -60,7 +60,8 @@ def pack_gltf(json_dict: dict[str, Json]) -> bytes:
         json_str
     )
 
-class awGltfExporter(vrm_export_scene.LegacyVrmExporter):
+# Replaces the original VRM Exporter
+class LegacyVrmExporter(vrm_export_scene.LegacyVrmExporter):
 
     #### properties整理
 
@@ -245,200 +246,29 @@ class awGltfExporter(vrm_export_scene.LegacyVrmExporter):
         print("AWSDK: gltf OK.")
         return self.result
 
-
+# types is needed to be defined for EXPORT_SCENE_OT_aw class
 class VrmValidationError(bpy.types.PropertyGroup):  # type: ignore[misc]
     message: bpy.props.StringProperty()  # type: ignore[valid-type]
     severity: bpy.props.IntProperty(min=0)  # type: ignore[valid-type]
 
-class EXPORT_SCENE_OT_aw(bpy.types.Operator, ExportHelper):  # type: ignore[misc]
+# rm_export_scene.export_vrm_update_addon_preferences,
+class EXPORT_SCENE_OT_aw(vrm_export_scene.EXPORT_SCENE_OT_vrm):  # type: ignore[misc]
     bl_idname = "export_scene.aw"
     bl_label = "Export Assetto Waifu"
     bl_description = "Export Assetto Waifu"
-    bl_options = {"REGISTER", "UNDO"}
 
     filename_ext = ".gltf"
     filter_glob: bpy.props.StringProperty(  # type: ignore[valid-type]
         default="*.gltf", options={"HIDDEN"}  # noqa: F722,F821
     )
 
-    export_invisibles: bpy.props.BoolProperty(  # type: ignore[valid-type]
-        name="Export Invisible Objects",  # noqa: F722
-        update=vrm_export_scene.export_vrm_update_addon_preferences,
-    )
-    export_only_selections: bpy.props.BoolProperty(  # type: ignore[valid-type]
-        name="Export Only Selections",  # noqa: F722
-        update=vrm_export_scene.export_vrm_update_addon_preferences,
-    )
-    enable_advanced_preferences: bpy.props.BoolProperty(  # type: ignore[valid-type]
-        name="Enable Advanced Options",  # noqa: F722
-        update=vrm_export_scene.export_vrm_update_addon_preferences,
-    )
-    export_fb_ngon_encoding: bpy.props.BoolProperty(  # type: ignore[valid-type]
-        name="Try the FB_ngon_encoding under development (Exported meshes can be corrupted)",  # noqa: F722
-        update=vrm_export_scene.export_vrm_update_addon_preferences,
-    )
     errors: bpy.props.CollectionProperty(type=VrmValidationError)  # type: ignore[valid-type]
-    armature_object_name: bpy.props.StringProperty(  # type: ignore[valid-type]
-        options={"HIDDEN"},  # noqa: F821
-    )
-    ignore_warning: bpy.props.BoolProperty(  # type: ignore[valid-type]
-        options={"HIDDEN"},  # noqa: F821
-    )
 
-    # icon可用的參數有：
+    # Error msg diplay
+    # Available icons types:
     # 'NONE', 'QUESTION', 'ERROR', 'CANCEL', 'TRIA_RIGHT', 'TRIA_DOWN', 'TRIA_LEFT', 'TRIA_UP', 'ARROW_LEFTRIGHT', 'PLUS', 'DISCLOSURE_TRI_DOWN', 'DISCLOSURE_TRI_RIGHT', 'RADIOBUT_ON', 'RADIOBUT_OFF', 'MENU_PANEL', 'BLENDER', 'GRIP', 'DOT', 'COLLAPSEMENU', 'X', 'GO_LEFT', 'PLUG', 'UI', 'NODE', 'NODE_SEL', 'FULLSCREEN', 'SPLITSCREEN', 'RIGHTARROW_THIN', 'DOWNARROW_HLT', 'DOTSUP', 'DOTSDOWN', 'LINK_AREA', 'LINK', 'INLINK', 'PLUGIN'
     icon = "NONE"
     msg = ""
-
-
-
-    def execute(self, context: bpy.types.Context) -> set[str]:
-        if not self.filepath:
-            return {"CANCELLED"}
-
-        if bpy.ops.vrm.model_validate(
-            "INVOKE_DEFAULT",
-            show_successful_message=False,
-            armature_object_name=self.armature_object_name,
-        ) != {"FINISHED"}:
-            return {"CANCELLED"}
-
-        preferences = vrm_export_scene.get_preferences(context)
-        export_invisibles = bool(preferences.export_invisibles)
-        export_only_selections = bool(preferences.export_only_selections)
-        if preferences.enable_advanced_preferences:
-            export_fb_ngon_encoding = bool(preferences.export_fb_ngon_encoding)
-        else:
-            export_fb_ngon_encoding = False
-
-        export_objects = vrm_export_scene.search.export_objects(
-            context,
-            export_invisibles,
-            export_only_selections,
-            self.armature_object_name,
-        )
-        is_vrm1 = any(
-            obj.type == "ARMATURE" and obj.data.vrm_addon_extension.is_vrm1()
-            for obj in export_objects
-        )
-
-        if is_vrm1:
-            vrm_exporter: vrm_export_scene.AbstractBaseVrmExporter = vrm_export_scene.Gltf2AddonVrmExporter(
-                context, export_objects
-            )
-        else:
-            vrm_exporter = awGltfExporter(
-            # vrm_exporter = vrm_export_scene.LegacyVrmExporter(
-                context,
-                export_objects,
-                export_fb_ngon_encoding,
-            )
-
-        # vrm_bin = vrm_exporter.export_vrm()
-        vrm_bin = vrm_exporter.export_gltf()
-        if vrm_bin is None:
-            return {"CANCELLED"}
-        vrm_export_scene.Path(self.filepath).write_bytes(vrm_bin)
-        return {"FINISHED"}
-
-    def invoke(self, context: bpy.types.Context, event: bpy.types.Event) -> set[str]:
-        # self.icon = "ERROR"
-        # self.msg = "123"
-
-        preferences = vrm_export_scene.get_preferences(context)
-        (
-            self.export_invisibles,
-            self.export_only_selections,
-            self.enable_advanced_preferences,
-            self.export_fb_ngon_encoding,
-        ) = (
-            bool(preferences.export_invisibles),
-            bool(preferences.export_only_selections),
-            bool(preferences.enable_advanced_preferences),
-            bool(preferences.export_fb_ngon_encoding),
-        )
-        if not vrm_export_scene.use_legacy_importer_exporter() and "gltf" not in dir(
-            bpy.ops.export_scene
-        ):
-            return vrm_export_scene.cast(
-                set[str],
-                bpy.ops.wm.vrm_gltf2_addon_disabled_warning(
-                    "INVOKE_DEFAULT",
-                ),
-            )
-
-        export_objects = vrm_export_scene.search.export_objects(
-            context,
-            bool(self.export_invisibles),
-            bool(self.export_only_selections),
-            self.armature_object_name,
-        )
-
-        armatures = [obj for obj in export_objects if obj.type == "ARMATURE"]
-        if len(armatures) > 1:
-            bpy.ops.wm.vrm_export_armature_selection("INVOKE_DEFAULT")
-            return {"CANCELLED"}
-        if len(armatures) == 1 and armatures[0].data.vrm_addon_extension.is_vrm0():
-            armature = armatures[0]
-            vrm_export_scene.Vrm0HumanoidPropertyGroup.fixup_human_bones(armature)
-            vrm_export_scene.Vrm0HumanoidPropertyGroup.check_last_bone_names_and_update(
-                armature.data.name,
-                defer=False,
-            )
-            humanoid = armature.data.vrm_addon_extension.vrm0.humanoid
-            if all(
-                b.node.bone_name not in b.node_candidates for b in humanoid.human_bones
-            ):
-                bpy.ops.vrm.assign_vrm0_humanoid_human_bones_automatically(
-                    armature_name=armature.name
-                )
-            if not humanoid.all_required_bones_are_assigned():
-                bpy.ops.wm.vrm_export_human_bones_assignment(
-                    "INVOKE_DEFAULT", armature_object_name=self.armature_object_name
-                )
-                return {"CANCELLED"}
-        elif len(armatures) == 1 and armatures[0].data.vrm_addon_extension.is_vrm1():
-            armature = armatures[0]
-            vrm_export_scene.Vrm1HumanBonesPropertyGroup.fixup_human_bones(armature)
-            vrm_export_scene.Vrm1HumanBonesPropertyGroup.check_last_bone_names_and_update(
-                armature.data.name,
-                defer=False,
-            )
-            human_bones = armature.data.vrm_addon_extension.vrm1.humanoid.human_bones
-            if all(
-                human_bone.node.bone_name not in human_bone.node_candidates
-                for human_bone in human_bones.human_bone_name_to_human_bone().values()
-            ):
-                bpy.ops.vrm.assign_vrm1_humanoid_human_bones_automatically(
-                    armature_name=armature.name
-                )
-            if not human_bones.all_required_bones_are_assigned():
-                bpy.ops.wm.vrm_export_human_bones_assignment(
-                    "INVOKE_DEFAULT", armature_object_name=self.armature_object_name
-                )
-                return {"CANCELLED"}
-
-        if bpy.ops.vrm.model_validate(
-            "INVOKE_DEFAULT",
-            show_successful_message=False,
-            armature_object_name=self.armature_object_name,
-        ) != {"FINISHED"}:
-            return {"CANCELLED"}
-
-        vrm_export_scene.validation.WM_OT_vrm_validator.detect_errors(
-            context,
-            self.errors,
-            self.armature_object_name,
-        )
-        if not self.ignore_warning and any(
-            error.severity <= 1 for error in self.errors
-        ):
-            bpy.ops.wm.vrm_export_confirmation(
-                "INVOKE_DEFAULT", armature_object_name=self.armature_object_name
-            )
-            return {"CANCELLED"}
-
-        return vrm_export_scene.cast(set[str], ExportHelper.invoke(self, context, event))
 
     def draw(self, context: bpy.types.Context) -> None:
         # These codes are copied from export_scene.VRM_PT_export_error_messages()
